@@ -34,11 +34,12 @@ public class LineRunner {
   private static final int MOTOR2_PWM = 4;
   private static final Pin MOTOR1_DIR = RaspiPin.GPIO_02;
   private static final Pin MOTOR2_DIR = RaspiPin.GPIO_05;
-  private static final Pin LINE_FOLLOW_A = RaspiPin.GPIO_06;
-  private static final Pin LINE_FOLLOW_B = RaspiPin.GPIO_14;
+  private static final Pin LINE_FOLLOW_A = RaspiPin.GPIO_14;
+  private static final Pin LINE_FOLLOW_B = RaspiPin.GPIO_06;
   private static final int ULTRASONIC = 1;
 
   public static enum Drive {
+
     reverse(PinState.HIGH, PinState.LOW),
     stop(PinState.LOW, PinState.LOW),
     forward(PinState.LOW, PinState.HIGH),
@@ -46,7 +47,7 @@ public class LineRunner {
     right(PinState.HIGH, PinState.HIGH);
     private final PinState motor1;
     private final PinState motor2;
-    
+
     Drive(PinState motor1, PinState motor2) {
       this.motor1 = motor1;
       this.motor2 = motor2;
@@ -54,6 +55,7 @@ public class LineRunner {
   };
 
   public static enum Speed {
+
     slow(55), medium(65), fast(80), accelerate(100);
     private final int pulse;
 
@@ -90,7 +92,7 @@ public class LineRunner {
     motor1Dir = gpio.provisionDigitalOutputPin(MOTOR1_DIR, "Motor1Dir");
     motor2Dir = gpio.provisionDigitalOutputPin(MOTOR2_DIR, "Motor2Dir");
     lineFollowA = gpio.provisionDigitalInputPin(LINE_FOLLOW_A, "LineFollowA");
-    lineFollowB = gpio.provisionDigitalInputPin(LINE_FOLLOW_B, "LineFollowA");
+    lineFollowB = gpio.provisionDigitalInputPin(LINE_FOLLOW_B, "LineFollowB");
     SoftPwm.softPwmCreate(MOTOR1_PWM, 0, 100);
     SoftPwm.softPwmCreate(MOTOR2_PWM, 0, 100);
     remote = SerialFactory.createInstance();
@@ -109,8 +111,9 @@ public class LineRunner {
     while (Gpio.digitalRead(ULTRASONIC) == 0 && System.nanoTime() - start < 23000000) {
     }
     long mid = System.nanoTime();
-    if (mid >= 23000000)
+    if (mid - start >= 23000000) {
       return -1;  // obstacle too close to detect distance
+    }
     while (Gpio.digitalRead(ULTRASONIC) == 1 && System.nanoTime() - mid < 23000000) {
     }
     long end = System.nanoTime();
@@ -169,7 +172,7 @@ public class LineRunner {
 
   private void doDrive(Drive drive) {
     motor1Dir.setState(drive.motor1);
-    motor1Dir.setState(drive.motor2);
+    motor2Dir.setState(drive.motor2);
     SoftPwm.softPwmWrite(MOTOR1_PWM, drive == Drive.stop ? 0 : speed.pulse);
     SoftPwm.softPwmWrite(MOTOR2_PWM, drive == Drive.stop ? 0 : speed.pulse);
     this.drive = drive;
@@ -184,17 +187,14 @@ public class LineRunner {
           boolean leftSensor = lineFollowA.getState().isHigh();
           boolean rightSensor = lineFollowB.getState().isHigh();
           if (leftSensor && rightSensor) { // we are lost
-            doDrive(lineLocation);
           } else if (!leftSensor && !rightSensor) { // on the line
-            doDrive(Drive.forward);
             lineLocation = Drive.forward;
           } else if (!leftSensor && rightSensor) { // slipping off the right
             lineLocation = Drive.left;
-            doDrive(Drive.forward);
           } else if (leftSensor && !rightSensor) { // slipping off the left
             lineLocation = Drive.right;
-            doDrive(Drive.forward);
           }
+          doDrive(lineLocation);
         }
         Gpio.delay(1);
       } else {
